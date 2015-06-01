@@ -1,3 +1,5 @@
+// OnReleaseItem um das Object am Pointer zu Freen
+
 unit thumbcontrol;
 
 //22.6.2010 Theo
@@ -9,108 +11,162 @@ interface
 
 uses
   Classes, SysUtils, scrollingcontrol, ThreadedImageLoader, types,
-  Graphics, fpImage, FPReadJPEGthumb, fpthumbresize, LResources,
-  FileUtil, Dialogs, GraphType, LCLIntf;
+  Graphics, fpImage, FPReadJPEGthumb, fpthumbresize,LResources,
+  FileUtil, Dialogs, GraphType, LCLIntf, Controls,LMessages;
 
 
 type
   TLayoutStyle = (LsAuto, LsAutoSize, LsHorizFixed, LsVertFixed, LsHorizAutoSize, LsVertAutoSize, LsGrid);
   TInternalLayoutStyle = (IlsHorz, IlsVert, IlsGrid);
+  TSelectStyle = (ssAlpha, ssFrame);
 
   TSelectItemEvent = procedure(Sender: TObject; Item: TThreadedImage) of object;
   TLoadFileEvent = procedure(Sender: TObject; URL: string; out Stream: TStream) of object;
+  TLoadPointerEvent = procedure(Sender: TObject; P: Pointer; out Stream: TStream) of object;
+  TDrawItemEvent = procedure(Sender: TObject; Item: TThreadedImage;aRect : TRect) of object;
 
 { TThumbControl }
 
   TThumbControl = class(TScrollingControl)
   private
+    FAfterDraw: TDrawItemEvent;
+    FColorSelect: TColor;
+    FOnDestroy: TNotifyEvent;
+    fOnItemIndexChanged: TSelectItemEvent;
+    FOnDrawCaption: TDrawItemEvent;
     FArrangeStyle: TLayoutStyle;
+    FCaptionHeight: Integer;
     FIls: TInternalLayoutStyle;
     fContentWidth: integer;
     fContentHeight: integer;
+    fResizeFactor: Double;
+    FSelectStyle: TSelectStyle;
+    fShiftSelectStartIDX: Integer;
     FDirectory: UTF8String;
     fMngr: TImageLoaderManager;
     FOnLoadFile: TLoadFileEvent;
-    FShowPictureFrame: Boolean;
+    FOnLoadPointer: TLoadPointerEvent;
+    FOnScrolled: TNotifyEvent;
+    FThumbFrameWith: Integer;
     FShowCaptions: Boolean;
     fAutoSort: boolean;
     fThumbWidth: integer;
     fThumbHeight: integer;
     FURLList: TStringList;
+    fMouseStartPos: TPoint;
+    fDragIDX: Integer;
     fUserThumbWidth: integer;
     fUserThumbHeight: integer;
-    fFrame: TBitmap;
-    fThumbDist: integer; //Distance between thumbnails
-    fPictureFrameBorder: integer; //One Border of blacke picture frame
-    fTextExtraHeight: integer;
-    fLeftOffset: integer; //first frame left offset
-    fTopOffset: integer;
+    fBackground: TBitmap;
+    fThumbDistance: integer; //Distance between thumbnails
+    fThumbLeftOffset: integer; //first frame left offset
+    fThumbTopOffset: integer;
     fOnSelectItem: TSelectItemEvent;
     fWindowCreated: Boolean;
+    fColorActiveFrame: TColor;
+    fColorFont: TColor;
+    fColorFontSelected: TColor;
     fGridThumbsPerLine: integer;
+    function GetDraggedItem: TThreadedImage;
     function GetFreeInvisibleImages: boolean;
+    function GetList: TList;
     function GetMultiThreaded: boolean;
+    function GetSelectedList: TList;
     function GetURLList: UTF8String;
+    procedure SetOnLoadFile(AValue: TLoadFileEvent);
+    procedure SetOnLoadPointer(AValue: TLoadPointerEvent);
+    procedure SetSelectStyle(AValue: TSelectStyle);
+    procedure SetThumbFrameWith(AValue: integer);
+    procedure SetThumbLeftOffset(AValue: integer);
+    procedure SetThumbTopOffset(AValue: integer);
+    function TColorToBGRInteger(Val: TColor): Integer;
     procedure Init;
     procedure SetArrangeStyle(const AValue: TLayoutStyle);
     procedure SetAutoSort(AValue: boolean);
+    procedure SetCaptionHeight(AValue: Integer);
+    procedure SetColorSelect(AValue: TColor);
     procedure SetDirectory(const AValue: UTF8String);
     procedure SetFreeInvisibleImages(const AValue: boolean);
     procedure SetMultiThreaded(const AValue: boolean);
-    procedure SetShowPictureFrame(const AValue: Boolean);
     procedure SetShowCaptions(const AValue: Boolean);
     procedure SetThumbDistance(const AValue: integer);
     procedure SetThumbHeight(const AValue: integer);
     procedure SetThumbWidth(const AValue: integer);
     procedure AsyncFocus(Data: PtrInt);
     procedure SetURLList(const AValue: UTF8String);
+    procedure DoClick(Button: TMouseButton; Shift:TShiftState; X,Y:Integer);
+    procedure ItemIndexChanged(Sender: TObject);
   protected
     class function GetControlClassDefaultSize: TSize; override;
     procedure BoundsChanged; override;
     procedure Paint; override;
+    procedure DblClick; override;
     procedure ImgLoadURL(Sender: TObject);
-    procedure ImgLoaded(Sender: TObject);
+    procedure ImgLoadPointer(Sender: TObject);
+    procedure ImgRepaint(Sender: TObject);
     procedure Search;
     procedure FileFoundEvent(FileIterator: TFileIterator);
     procedure CreateWnd; override;
-    procedure Click; override;
     procedure DoSelectItem; virtual;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure KeyUp(var Key: Word; Shift: TShiftState); override;
     procedure UpdateDims;
-    procedure Arrange;
+    procedure DoEnter; override;
+    procedure DoExit; override;
+    procedure MouseDown(Button: TMouseButton; Shift:TShiftState; X,Y:Integer); override;
+    procedure MouseMove(Shift: TShiftState; X,Y: Integer); override;
+    procedure MouseUp(Button: TMouseButton; Shift:TShiftState; X,Y:Integer); override;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     {:Use this function when you need the item from control coordinates (Mouse etc.)}
     function ItemFromPoint(APoint: TPoint): TThreadedImage;
+    function AddImage(Image: TThreadedImage): Integer;
+    procedure DeleteSelectedImages;
     procedure ScrollIntoView;
     procedure LoadSelectedBitmap(ABitmap:TBitmap);
+    procedure ClearImageList;
+    procedure AddImagePointer(P: Pointer);
+    procedure Arrange;
     property URLList: UTF8String read GetURLList write SetURLList;
     property ImageLoaderManager: TImageLoaderManager read fMngr;
   published
     property Directory: UTF8String read FDirectory write SetDirectory stored True nodefault;
     property ThumbWidth: integer read fUserThumbWidth write SetThumbWidth;
     property ThumbHeight: integer read fUserThumbHeight write SetThumbHeight;
-    property ThumbDistance: integer read fThumbDist write SetThumbDistance;
+    property ThumbDistance: integer read fThumbDistance write SetThumbDistance;
+    property ThumbFrameWith: integer read FThumbFrameWith write SetThumbFrameWith;
+    property ThumbLeftOffset: integer read fThumbLeftOffset write SetThumbLeftOffset;
+    property ThumbTopOffset: integer read fThumbTopOffset write SetThumbTopOffset;
+    {:If you set ThumbResizeFactor to <>0 , the images will be resized with this Factor
+      If they are still to Big after applying the Factor, they will bo resiized to fit ThumbWith and ThumbHeight}
+    property ThumbResizeFactor: Double read fResizeFactor write fResizeFactor;
     {:If you set MultiThreaded to true, the images will be loaded in the "background" not blocking the application.
       Warning: The debugger GDB may not like this setting. Be careful in OnLoadFile in this mode}
     property MultiThreaded: boolean read GetMultiThreaded write SetMultiThreaded;
     {:Show/Hide the filename captions.}
     property ShowCaptions: Boolean read FShowCaptions write SetShowCaptions;
-    {:Show/Hide picture Frame}
-    property ShowPictureFrame: Boolean read FShowPictureFrame write SetShowPictureFrame;
     {:Different modes, basically horizontal, vertical and grid plus autosize and auto layout modes, depending on the size of the control}
     property Layout: TLayoutStyle read FArrangeStyle write SetArrangeStyle;
+    property SelectStyle: TSelectStyle read FSelectStyle write SetSelectStyle;
     {:Do not keep in memory the bitmaps that are currently invisble. (Slower but less resource hungry).}
     property FreeInvisibleImages: boolean read GetFreeInvisibleImages write SetFreeInvisibleImages;
-    {:Event triggered when a thumbnail is clicked or selected using the enter key.}
+    {:Event triggered when a thumbnail is doubleclicked or selected using the enter key.}
     property OnSelectItem: TSelectItemEvent read fOnSelectItem write fOnSelectItem;
-    {:Event when image stream data is required. Useful for loading data via http, ftp etc.
+    {:Event triggered when ActiveIndex is changed.}
+    property OnItemIndexChanged: TSelectItemEvent read fOnItemIndexChanged write fOnItemIndexChanged;
+     {:Event when image stream data is required. Useful for loading data via http, ftp etc.
       Warning: if MultiThreaded=true, this happens in a separate thread context.}
     property AutoSort : boolean read fAutoSort write SetAutoSort;
     {:Sort URL by name}
-    property OnLoadFile: TLoadFileEvent read FOnLoadFile write FOnLoadFile;
+    property OnLoadFile: TLoadFileEvent read FOnLoadFile write SetOnLoadFile;
+    property OnLoadPointer: TLoadPointerEvent read FOnLoadPointer write SetOnLoadPointer;
+    property OnScrolled : TNotifyEvent read FOnScrolled write FOnScrolled;
+    property AfterDraw : TDrawItemEvent read FAfterDraw write FAfterDraw;
+    property OnDrawCaption: TDrawItemEvent read FOnDrawCaption write FOnDrawCaption;
+    property SelectedList: TList read GetSelectedList;
+    property List: TList read GetList;
+    property DragedItem: TThreadedImage read GetDraggedItem;
     property ScrollBars;
     property Align;
     property Anchors;
@@ -121,6 +177,11 @@ type
     property ClientHeight;
     property ClientWidth;
     property Color;
+    property ColorActiveFrame: TColor read fColorActiveFrame write fColorActiveFrame;
+    property ColorSelect: TColor read FColorSelect write SetColorSelect;
+    property ColorFont: TColor read fColorFont write fColorFont;
+    property ColorFontSelected: TColor read fColorFontSelected write fColorFontSelected;
+    property CaptionHight: Integer read FCaptionHeight write SetCaptionHeight;
     property Constraints;
     property DockSite;
     property DragCursor;
@@ -141,6 +202,7 @@ type
     property OnClick;
     property OnContextPopup;
     property OnDblClick;
+    property OnDestroy: TNotifyEvent read FOnDestroy write FOnDestroy;
     property OnDragDrop;
     property OnDockDrop;
     property OnDockOver;
@@ -169,14 +231,11 @@ type
 
 var frame: TPortableNetworkGraphic;
 
-const StockBorderWidth = 15;
-  StockTextExtraHeight = 8;
-
 procedure Register;
 
 implementation
 
-uses LCLType, Forms, Controls, fontfinder,
+uses LCLType, Forms, fontfinder,
 fpreadgif,FPReadPSD,FPReadPCX,FPReadTGA; //just register them
 
 
@@ -251,10 +310,36 @@ begin
   Arrange;
 end;
 
+procedure TThumbControl.DoClick(Button: TMouseButton; Shift: TShiftState; X,
+  Y: Integer);
+var
+  Idx: Integer;
+begin
+  Idx := fMngr.ItemIndexFromPoint(Point(X + HScrollPosition, Y + VScrollPosition));
+  if Idx > -1 then begin
+    if Shift=[] then begin
+      fMngr.DeselectAll;
+      fMngr.ActiveIndex := Idx;
+      Invalidate;
+    end else if Shift=[ssShift] then begin
+      fMngr.SetActiveIndexAndSelectBetween(Idx);
+      Invalidate;
+    end else if Shift=[ssCtrl] then begin
+      fMngr.SetActiveIndexAndChangeSelected(Idx);
+      Invalidate;
+    end;
+  end;
+  SetFocus;
+end;
 
 function TThumbControl.GetMultiThreaded: boolean;
 begin
   if Assigned(fMngr) then Result := fMngr.MultiThreaded;
+end;
+
+function TThumbControl.GetSelectedList: TList;
+begin
+  if Assigned(fMngr) then Result:=fMngr.SelectedList;
 end;
 
 function TThumbControl.GetFreeInvisibleImages: boolean;
@@ -262,9 +347,101 @@ begin
   Result := fMngr.FreeInvisibleImage;
 end;
 
+function TThumbControl.GetList: TList;
+begin
+  if Assigned(fMngr) then Result:=fMngr.List;
+end;
+
+function TThumbControl.GetDraggedItem: TThreadedImage;
+begin
+  Result := fMngr.ItemFromIndex(fDragIDX);
+end;
+
 function TThumbControl.GetURLList: UTF8String;
 begin
   Result := FURLList.Text;
+end;
+
+procedure TThumbControl.SetOnLoadFile(AValue: TLoadFileEvent);
+begin
+  FOnLoadFile:=AValue;
+  if csDesigning in ComponentState then exit;
+  if Assigned(fMngr) then begin
+    if Assigned(FOnLoadFile) then begin
+      fMngr.OnLoadURL:=@ImgLoadURL;
+    end else begin
+      fMngr.OnLoadURL:=Nil;
+    end;
+  end;
+end;
+
+procedure TThumbControl.SetOnLoadPointer(AValue: TLoadPointerEvent);
+begin
+  if FOnLoadPointer=AValue then Exit;
+  FOnLoadPointer:=AValue;
+  if Assigned(fMngr) then begin
+    if Assigned(FOnLoadPointer) then begin
+      fMngr.OnLoadPointer:=@ImgLoadPointer;
+    end else begin
+      fMngr.OnLoadPointer:=Nil;
+    end;
+  end;
+end;
+
+procedure TThumbControl.SetSelectStyle(AValue: TSelectStyle);
+begin
+  if FSelectStyle <> AValue then begin
+    FSelectStyle := AValue;
+    if not (csLoading in ComponentState) then begin
+      Arrange;
+      Invalidate;
+    end;
+  end;
+end;
+
+procedure TThumbControl.SetThumbFrameWith(AValue: integer);
+begin
+  if FThumbFrameWith<>AValue then begin
+    FThumbFrameWith:=AValue;
+    if Assigned(fMngr) then fMngr.ThumbFrameWith:=FThumbFrameWith;
+    if not (csLoading in ComponentState) then begin
+      Arrange;
+      Invalidate;
+    end;
+  end;
+end;
+
+procedure TThumbControl.SetThumbLeftOffset(AValue: integer);
+begin
+  if fThumbLeftOffset <> AValue then
+  begin
+    fThumbLeftOffset := AValue;
+    if not (csLoading in ComponentState) then
+    begin
+      Arrange;
+      Invalidate;
+    end;
+  end;
+end;
+
+procedure TThumbControl.SetThumbTopOffset(AValue: integer);
+begin
+  if fThumbTopOffset <> AValue then
+  begin
+    fThumbTopOffset := AValue;
+    if not (csLoading in ComponentState) then
+    begin
+      Arrange;
+      Invalidate;
+    end;
+  end;
+end;
+
+function TThumbControl.TColorToBGRInteger(Val: TColor): Integer;
+begin
+  Result:=((Val and $00ff0000) shr 16) or
+          (Val and $0000ff00) or
+          ((Val and $000000ff) shl 16);
 end;
 
 procedure TThumbControl.SetArrangeStyle(const AValue: TLayoutStyle);
@@ -287,34 +464,33 @@ begin
   fMngr.Sort(0);
 end;
 
+procedure TThumbControl.SetCaptionHeight(AValue: Integer);
+begin
+  if FCaptionHeight=AValue then Exit;
+  FCaptionHeight:=AValue;
+  if Assigned(fMngr) then fMngr.CaptionHeight:=FCaptionHeight;
+  Arrange;
+end;
+
+procedure TThumbControl.SetColorSelect(AValue: TColor);
+begin
+  if FColorSelect<>AValue then begin
+    FColorSelect:=AValue;
+    if Assigned(fMngr) then begin
+      fMngr.SelectColor:=FColorSelect;
+    end;
+  end;
+end;
+
 procedure TThumbControl.SetMultiThreaded(const AValue: boolean);
 begin
   if Assigned(fMngr) then fMngr.MultiThreaded := AValue;
 end;
 
-procedure TThumbControl.SetShowPictureFrame(const AValue: Boolean);
-begin
-  FShowPictureFrame := AValue;
-  if FShowPictureFrame then
-  begin
-    fPictureFrameBorder := StockBorderWidth;
-    if FShowCaptions then fTextExtraHeight := 0;
-  end else
-  begin
-    fPictureFrameBorder := 0;
-    if FShowCaptions then fTextExtraHeight := StockTextExtraHeight;
-  end;
-  if not (csLoading in ComponentState) then
-  begin
-    Arrange;
-    Invalidate;
-  end;
-end;
 
 procedure TThumbControl.SetShowCaptions(const AValue: Boolean);
 begin
   FShowCaptions := AValue;
-  if FShowCaptions and (not FShowPictureFrame) then fTextExtraHeight := StockTextExtraHeight else fTextExtraHeight := 0;
   if not (csLoading in ComponentState) then
   begin
     Arrange;
@@ -324,9 +500,9 @@ end;
 
 procedure TThumbControl.SetThumbDistance(const AValue: integer);
 begin
-  if fThumbDist <> AValue then
+  if fThumbDistance <> AValue then
   begin
-    fThumbDist := AValue;
+    fThumbDistance := AValue;
     if not (csLoading in ComponentState) then
     begin
       Arrange;
@@ -340,7 +516,7 @@ begin
   if fThumbHeight <> AValue then
   begin
     fThumbHeight := AValue;
-    fUserThumbHeight := AValue;
+    fUserThumbHeight := fThumbHeight;
     if not (csLoading in ComponentState) then
     begin
       Arrange;
@@ -355,8 +531,6 @@ begin
   begin
     fThumbWidth := AValue;
     fUserThumbWidth := AValue;
-    SmallStep := fThumbWidth;
-    LargeStep := fThumbWidth * 4;
     if not (csLoading in ComponentState) then
     begin
       Arrange;
@@ -373,26 +547,14 @@ begin
   Init;
 end;
 
-
-procedure TThumbControl.Click;
-var Idx: Integer;
-  pt: TPoint;
-begin
-  pt := ScreenToClient(Mouse.CursorPos);
-  Idx := fMngr.ItemIndexFromPoint(Point(pt.X + HScrollPosition, pt.Y + VScrollPosition));
-  inherited;
-  if Idx > -1 then
-  begin
-    fMngr.ActiveIndex := Idx;
-    DoSelectItem;
-    Invalidate;
-  end;
-  SetFocus;
-end;
-
 procedure TThumbControl.DoSelectItem;
 begin
   if Assigned(fOnSelectItem) then OnSelectItem(Self, fMngr.ActiveItem);
+end;
+
+procedure TThumbControl.ItemIndexChanged(Sender: TObject);
+begin
+  if Assigned(fOnItemIndexChanged) then OnItemIndexChanged(Self, fMngr.ActiveItem);
 end;
 
 procedure TThumbControl.AsyncFocus(Data: PtrInt);
@@ -403,30 +565,88 @@ end;
 procedure TThumbControl.KeyDown(var Key: Word; Shift: TShiftState);
 begin
   inherited KeyDown(Key, Shift);
-  case key of
-    VK_LEFT: begin fMngr.ActiveIndex := fMngr.ActiveIndex - 1; ScrollIntoView; end;
-    VK_RIGHT: begin fMngr.ActiveIndex := fMngr.ActiveIndex + 1; ScrollIntoView; end;
+  if Shift=[] then begin
+    case key of
+      VK_LEFT: begin fMngr.ActiveIndex := fMngr.ActiveIndex - 1; ScrollIntoView; end;
+      VK_RIGHT: begin fMngr.ActiveIndex := fMngr.ActiveIndex + 1; ScrollIntoView; end;
 
-    VK_UP: if FIls = IlsGrid then
-      begin
-        fMngr.ActiveIndex := fMngr.ActiveIndex - fGridThumbsPerLine; ScrollIntoView;
-      end else
-      begin fMngr.ActiveIndex := fMngr.ActiveIndex - 1;
-        ScrollIntoView;
-      end;
+      VK_UP: if FIls = IlsGrid then
+        begin
+          fMngr.ActiveIndex := fMngr.ActiveIndex - fGridThumbsPerLine; ScrollIntoView;
+        end else
+        begin fMngr.ActiveIndex := fMngr.ActiveIndex - 1;
+          ScrollIntoView;
+        end;
 
-    VK_DOWN: if FIls = IlsGrid then
+      VK_DOWN: if FIls = IlsGrid then
+        begin
+          fMngr.ActiveIndex := fMngr.ActiveIndex + fGridThumbsPerLine; ScrollIntoView;
+        end else
+        begin fMngr.ActiveIndex := fMngr.ActiveIndex + 1;
+          ScrollIntoView;
+        end;
+      VK_RETURN: DoSelectItem;
+      VK_PRIOR: if (FIls = IlsVert) or (FIls = IlsGrid) then
+          VScrollPosition := VScrollPosition - ClientHeight else HScrollPosition := HScrollPosition - ClientWidth;
+      VK_NEXT: if (FIls = IlsVert) or (FIls = IlsGrid) then
+          VScrollPosition := VScrollPosition + ClientHeight else HScrollPosition := HScrollPosition + ClientWidth;
+      VK_SPACE: fMngr.SetActiveIndexAndChangeSelected(fMngr.ActiveIndex);
+    end;
+  end else if Shift=[ssShift] then begin
+    case key of
+      VK_SHIFT: fShiftSelectStartIDX := fMngr.ActiveIndex;
+      VK_LEFT:
       begin
-        fMngr.ActiveIndex := fMngr.ActiveIndex + fGridThumbsPerLine; ScrollIntoView;
-      end else
-      begin fMngr.ActiveIndex := fMngr.ActiveIndex + 1;
-        ScrollIntoView;
+        fMngr.ActiveIndex := fMngr.ActiveIndex - 1; ScrollIntoView;
+        if fShiftSelectStartIDX>-1 then fMngr.SelectBetween(fShiftSelectStartIDX,fMngr.ActiveIndex);
       end;
-    VK_RETURN: DoSelectItem;
-    VK_PRIOR: if (FIls = IlsVert) or (FIls = IlsGrid) then
-        VScrollPosition := VScrollPosition - ClientHeight else HScrollPosition := HScrollPosition - ClientWidth;
-    VK_NEXT: if (FIls = IlsVert) or (FIls = IlsGrid) then
-        VScrollPosition := VScrollPosition + ClientHeight else HScrollPosition := HScrollPosition + ClientWidth;
+      VK_RIGHT:
+      begin
+        fMngr.ActiveIndex := fMngr.ActiveIndex + 1; ScrollIntoView;
+        if fShiftSelectStartIDX>-1 then fMngr.SelectBetween(fShiftSelectStartIDX,fMngr.ActiveIndex);
+      end;
+      VK_UP: if FIls = IlsGrid then
+        begin
+          fMngr.ActiveIndex := fMngr.ActiveIndex - fGridThumbsPerLine; ScrollIntoView;
+          if fShiftSelectStartIDX>-1 then fMngr.SelectBetween(fShiftSelectStartIDX,fMngr.ActiveIndex);
+        end else
+        begin
+          fMngr.ActiveIndex := fMngr.ActiveIndex - 1;
+          ScrollIntoView;
+          if fShiftSelectStartIDX>-1 then fMngr.SelectBetween(fShiftSelectStartIDX,fMngr.ActiveIndex);
+        end;
+      VK_DOWN: if FIls = IlsGrid then
+        begin
+          fMngr.ActiveIndex := fMngr.ActiveIndex + fGridThumbsPerLine; ScrollIntoView;
+          if fShiftSelectStartIDX>-1 then fMngr.SelectBetween(fShiftSelectStartIDX,fMngr.ActiveIndex);
+        end else
+        begin
+          fMngr.ActiveIndex := fMngr.ActiveIndex + 1;
+          ScrollIntoView;
+          if fShiftSelectStartIDX>-1 then fMngr.SelectBetween(fShiftSelectStartIDX,fMngr.ActiveIndex);
+        end;
+      VK_PRIOR: if (FIls = IlsVert) or (FIls = IlsGrid) then
+        begin
+          VScrollPosition := VScrollPosition - ClientHeight;
+          if fShiftSelectStartIDX>-1 then fMngr.SelectBetween(fShiftSelectStartIDX,fMngr.ActiveIndex);
+        end else begin
+          HScrollPosition := HScrollPosition - ClientWidth;
+          if fShiftSelectStartIDX>-1 then fMngr.SelectBetween(fShiftSelectStartIDX,fMngr.ActiveIndex);
+        end;
+      VK_NEXT: if (FIls = IlsVert) or (FIls = IlsGrid) then
+        begin
+          VScrollPosition := VScrollPosition + ClientHeight;
+          if fShiftSelectStartIDX>-1 then fMngr.SelectBetween(fShiftSelectStartIDX,fMngr.ActiveIndex);
+        end else begin
+          HScrollPosition := HScrollPosition + ClientWidth;
+          if fShiftSelectStartIDX>-1 then fMngr.SelectBetween(fShiftSelectStartIDX,fMngr.ActiveIndex);
+        end;
+    end;
+  end else if Shift=[ssCtrl] then begin
+    case Key of
+			ord('A'): fMngr.SelectAll;
+			ord('D'): fMngr.DeselectAll;
+    end;
   end;
   Invalidate;
   Application.QueueAsyncCall(@AsyncFocus, 0);
@@ -434,6 +654,11 @@ end;
 
 procedure TThumbControl.KeyUp(var Key: Word; Shift: TShiftState);
 begin
+  if Shift=[ssShift] then begin
+    case Key of
+      VK_SHIFT: fShiftSelectStartIDX:=-1;
+    end;
+  end;
   inherited KeyUp(Key, Shift);
   SetFocus;
 end;
@@ -455,13 +680,13 @@ begin
 
     if (FIls = IlsHorz) then
       if Abs(Arect.Left - Itm.Rect.Left) > (Arect.Right - Itm.Rect.Right) then
-        HScrollPosition := itm.Rect.Right - ClientWidth + fPictureFrameBorder + fThumbDist else
-        HScrollPosition := itm.Rect.Left - ClientWidth - fPictureFrameBorder - fThumbDist + ClientWidth;
+        HScrollPosition := itm.Rect.Right - ClientWidth + FThumbFrameWith + fThumbDistance else
+        HScrollPosition := itm.Rect.Left - ClientWidth - FThumbFrameWith - fThumbDistance + ClientWidth;
 
     if (FIls = IlsVert) or (FIls = IlsGrid) then
       if Abs(Arect.Top - Itm.Rect.Top) > (Arect.Bottom - Itm.Rect.Bottom) then
-        VScrollPosition := itm.Rect.Bottom - ClientHeight + fPictureFrameBorder + fThumbDist else
-        VScrollPosition := itm.Rect.Top - ClientHeight - fPictureFrameBorder - fThumbDist + ClientHeight;
+        VScrollPosition := itm.Rect.Bottom - ClientHeight + FThumbFrameWith + fThumbDistance else
+        VScrollPosition := itm.Rect.Top - ClientHeight - FThumbFrameWith - fThumbDistance + ClientHeight;
     UpdateDims;
   end;
 end;
@@ -498,79 +723,99 @@ begin
       Clipped := false;
     end;
 
-    Canvas.Brush.Color := clWhite;
+    Canvas.Brush.Color := Color;
     Canvas.FillRect(ARect);
     OffsetRect(aRect, HScrollPosition, VScrollPosition);
     if not clipped then fMngr.LoadRect(ARect);
 
     Canvas.Brush.color :=  $F1F1F1;
 
-    for i := 0 to fmngr.List.Count - 1 do
-    begin
+    for i := 0 to fmngr.List.Count - 1 do begin
       Cim := TThreadedImage(fmngr.List[i]);
       BorderRect := Cim.Rect;
-      if IntersectRect(Dum, BorderRect, Arect) then
-      begin
-        OffSetRect(BorderRect, -HScrollPosition, -VScrollPosition);
-        if fShowPictureFrame then
-          Canvas.Draw(BorderRect.Left - fPictureFrameBorder, BorderRect.Top - fPictureFrameBorder, fFrame) else
+      if IntersectRect(Dum, BorderRect, aRect) then begin
+        if Cim.LoadState = lsLoaded then begin
+          // Draw Thumb
+          case FSelectStyle of
+            ssFrame:
+            begin
+              if Cim.Selected then begin
+                BorderRect := Cim.Rect;
+                InflateRect(BorderRect, FThumbFrameWith, FThumbFrameWith);
+                OffSetRect(BorderRect, -HScrollPosition, -VScrollPosition);
+                Canvas.Brush.Color := FColorSelect;
+                Canvas.FillRect(BorderRect);
+              end;
+              Canvas.Draw(Cim.Left + Cim.Area.Left - HScrollPosition,
+                Cim.Top + Cim.Area.Top - VScrollPosition,
+                Cim.Bitmap);
+            end;
+            ssAlpha:
+            begin
+              if (Cim.Selected) then begin
+                Canvas.Draw(Cim.Left + Cim.Area.Left - HScrollPosition,
+                  Cim.Top + Cim.Area.Top - VScrollPosition,
+                  Cim.BitmapSelected);
+              end else begin
+                Canvas.Draw(Cim.Left + Cim.Area.Left - HScrollPosition,
+                  Cim.Top + Cim.Area.Top - VScrollPosition,
+                  Cim.Bitmap);
+              end;
+            end;
+          end;
+        end;
+
+        if (i=fMngr.ActiveIndex) and Focused then
         begin
-          InflateRect(BorderRect, 1, 1);
+          BorderRect := Cim.Rect;
+          OffSetRect(BorderRect, -HScrollPosition, -VScrollPosition);
           Canvas.Brush.Style := bsClear;
-          Canvas.Pen.Color := clLtGray;
+          Canvas.Pen.Color := fColorActiveFrame;
+          Canvas.Pen.Width :=1;
+          Canvas.Rectangle(BorderRect);
+          InflateRect(BorderRect,-1,-1);
+          Canvas.Rectangle(BorderRect);
+          InflateRect(BorderRect,-1,-1);
           Canvas.Rectangle(BorderRect);
           Canvas.Brush.Style := bsSolid;
         end;
 
-        if Cim.LoadState = lsLoaded then
-        begin
-          Canvas.Draw(Cim.Left + Cim.Area.Left - HScrollPosition,
-            Cim.Top + Cim.Area.Top - VScrollPosition,
-            Cim.Bitmap);
-           if i = fMngr.ActiveIndex then
-          begin
-            BorderRect := Cim.Area;
-            OffSetRect(BorderRect, -HScrollPosition + Cim.Rect.Left,
-              -VScrollPosition + Cim.Rect.Top);
-            InflateRect(BorderRect, 1, 1);
+        if fShowCaptions then begin
+          // Draw Caption
+          if Assigned(FOnDrawCaption) then begin
+            BorderRect:= Rect(Cim.Rect.Left,Cim.Rect.Bottom+FThumbFrameWith,Cim.Rect.Right,Cim.Rect.Bottom+fCaptionHeight+FThumbFrameWith);
+            OffSetRect(BorderRect, -HScrollPosition, -VScrollPosition);
+            OnDrawCaption(Self,Cim,BorderRect);
+          end else begin
+            if Cim.URL = '' then
+              UrlStr := ShortenString('Undefined', Cim.Width, Canvas) else
+              UrlStr := ShortenString(ExtractFileName(Cim.URL),
+                Cim.Width, Canvas);
+            tlen := (Cim.Width - Canvas.TextWidth(UrlStr)) div 2;
+            Canvas.Font.color := fColorFont;
             Canvas.Brush.Style := bsClear;
-            Canvas.Pen.Color := $448FA2;
-            Canvas.Pen.Width := 2;
-            Canvas.Rectangle(BorderRect);
-            Canvas.Pen.Width := 1;
+            Canvas.TextOut(
+              Cim.Left - HScrollPosition + 1 + tlen,
+              Cim.Height + Cim.Top - VScrollPosition - 1,
+              UrlStr);
             Canvas.Brush.Style := bsSolid;
           end;
         end;
-
-        if fShowCaptions then
-        begin
-          if Cim.URL = '' then
-            UrlStr := ShortenString('Undefined', Cim.Width, Canvas) else
-            UrlStr := ShortenString(ExtractFileName(Cim.URL),
-              Cim.Width, Canvas);
-          tlen := (Cim.Width - Canvas.TextWidth(UrlStr)) div 2;
-          if not FShowPictureFrame then
-            if i = fMngr.ActiveIndex then Canvas.Font.color := clGray else Canvas.Font.color := ClBlack else
-          begin
-            Canvas.Brush.Style := bsSolid;
-            Canvas.Brush.Color := clBlack;
-            Canvas.FillRect(Cim.Left - HScrollPosition + tlen - 1,
-              Cim.Height + Cim.Top - VScrollPosition + 1,
-              Cim.Left - HScrollPosition + 2 + tlen + Canvas.TextWidth(UrlStr),
-              Cim.Height + Cim.Top - VScrollPosition + 10);
-            if i = fMngr.ActiveIndex then Canvas.Font.color := clWhite else Canvas.Font.color := $448FA2;
-          end;
-          Canvas.Brush.Style := bsClear;
-          Canvas.TextOut(
-            Cim.Left - HScrollPosition + 1 + tlen,
-            Cim.Height + Cim.Top - VScrollPosition - 1,
-            UrlStr);
-          Canvas.Brush.Style := bsSolid;
+      if Assigned(AfterDraw) then begin
+          BorderRect := Cim.Rect;
+          OffSetRect(BorderRect, -HScrollPosition, -VScrollPosition);
+          AfterDraw(Self,Cim,BorderRect);
         end;
       end;
     end;
   end;
   inherited Paint;
+end;
+
+procedure TThumbControl.DblClick;
+begin
+  DoSelectItem;
+  inherited DblClick;
 end;
 
 function GetFPReaderMask: string;
@@ -616,8 +861,8 @@ begin
   if (FArrangeStyle = LsAuto) or (FArrangeStyle = LsAutoSize) then
   begin
     if width > height then FIls := IlsHorz else FIls := IlsVert;
-    if (width > 2 * fUserThumbWidth + 4 * fPictureFrameBorder) and
-    (Height > 2 * fUserThumbHeight + 4 * fPictureFrameBorder) then FIls := IlsGrid;
+    if (width > 2 * fUserThumbWidth + 4 * FThumbFrameWith) and
+    (Height > 2 * fUserThumbHeight + 4 * FThumbFrameWith) then FIls := IlsGrid;
   end;
 
   if (FArrangeStyle = LsHorizFixed) or (FArrangeStyle = LsVertFixed) or
@@ -635,7 +880,7 @@ begin
   if (FArrangeStyle = LsHorizAutoSize) or ((FArrangeStyle = LsAutoSize) and (FIls = IlsHorz)) then
   begin
     aDim := fThumbHeight;
-    fThumbHeight := ClientHeight - fPictureFrameBorder * 2 - fTextExtraHeight - 2 * fTopOffset - 20;
+    fThumbHeight := ClientHeight - FThumbFrameWith * 2 - fCaptionHeight - 2 * fThumbTopOffset - 20;
     fThumbWidth := Round(fThumbHeight / fUserThumbHeight * fUserThumbWidth);
     FIls := IlsHorz;
     if ADim <> fThumbHeight then
@@ -648,8 +893,9 @@ begin
   if (FArrangeStyle = LsVertAutoSize) or ((FArrangeStyle = LsAutoSize) and (FIls = IlsVert)) then
   begin
     aDim := fThumbWidth;
-    fThumbWidth := ClientWidth - fPictureFrameBorder * 2 - 2 * fLeftOffset - 20;
-    fThumbHeight := Round(fThumbWidth / fUserThumbWidth * fUserThumbHeight);
+    fThumbWidth := ClientWidth - FThumbFrameWith * 2 - 2 * fThumbLeftOffset - 20;
+    fThumbHeight := round(fThumbWidth / fUserThumbWidth * fUserThumbHeight);
+    fThumbHeight := round(fThumbWidth / fUserThumbWidth * fUserThumbHeight);
     FIls := IlsVert;
     if ADim <> fThumbWidth then
     begin
@@ -658,13 +904,13 @@ begin
     end;
   end;
 
-  if FShowPictureFrame then
-  begin
-    fFrame.SetSize(fThumbWidth + fPictureFrameBorder * 2, fThumbHeight + fPictureFrameBorder * 2);
-    fFrame.Canvas.Brush.FPColor := TColorToFPColor(clWhite);
-    fFrame.Canvas.FillRect(0, 0, fFrame.Width, fFrame.Height);
-    fFrame.Canvas.StretchDraw(Rect(0, 0, fFrame.Width, fFrame.Height), frame);
-  end;
+  //if FShowPictureFrame then
+  //begin
+  //  fBackground.SetSize(fThumbWidth + FThumbFrameWith * 2, fThumbHeight + FThumbFrameWith * 2);
+  //  fBackground.Canvas.Brush.FPColor := TColorToFPColor(Color);
+  //  fBackground.Canvas.FillRect(0, 0, fBackground.Width, fBackground.Height);
+  //  fBackground.Canvas.StretchDraw(Rect(0, 0, fBackground.Width, fBackground.Height), frame);
+  //end;
 
   if FIls = IlsHorz then
   begin
@@ -672,12 +918,12 @@ begin
     begin
       TThreadedImage(fMngr.List[i]).Width := fThumbWidth;
       TThreadedImage(fMngr.List[i]).Height := fThumbHeight;
-      TThreadedImage(fMngr.List[i]).Left := i * (fThumbWidth + fThumbDist +
-      fPictureFrameBorder * 2) +  fLeftOffset + fPictureFrameBorder;
-      TThreadedImage(fMngr.List[i]).Top := fTopOffset + fPictureFrameBorder;
+      TThreadedImage(fMngr.List[i]).Left := i * (fThumbWidth + fThumbDistance +
+      FThumbFrameWith * 2) +  fThumbLeftOffset + FThumbFrameWith;
+      TThreadedImage(fMngr.List[i]).Top := fThumbTopOffset + FThumbFrameWith;
     end;
-    fContentWidth := fMngr.List.Count * (fThumbWidth + fThumbDist + fPictureFrameBorder * 2) + fLeftOffset;
-    fContentHeight := fThumbHeight + fPictureFrameBorder * 2 + fTopOffset;
+    fContentWidth := fMngr.List.Count * (fThumbWidth + fThumbDistance + FThumbFrameWith * 2) + fThumbLeftOffset;
+    fContentHeight := fThumbHeight + FThumbFrameWith * 2 + fThumbTopOffset;
   end;
 
   if FIls = IlsVert then
@@ -686,37 +932,41 @@ begin
     begin
       TThreadedImage(fMngr.List[i]).Width := fThumbWidth;
       TThreadedImage(fMngr.List[i]).Height := fThumbHeight;
-      TThreadedImage(fMngr.List[i]).Left := fLeftOffset + fPictureFrameBorder;
-      TThreadedImage(fMngr.List[i]).Top := i * (fThumbHeight + fThumbDist +
-      fTextExtraHeight + fPictureFrameBorder * 2) + fTopOffset + fPictureFrameBorder;
+      TThreadedImage(fMngr.List[i]).Left := fThumbLeftOffset + FThumbFrameWith;
+      TThreadedImage(fMngr.List[i]).Top := i * (fThumbHeight + fThumbDistance +
+      fCaptionHeight + FThumbFrameWith * 2) + fThumbTopOffset + FThumbFrameWith;
     end;
-    fContentHeight := (fMngr.List.Count) * (fThumbHeight + fTextExtraHeight + fThumbDist +
-    fPictureFrameBorder * 2) + fTopOffset;
-    fContentWidth := fThumbWidth + fPictureFrameBorder * 2 + fLeftOffset;
+    fContentHeight := (fMngr.List.Count) * (fThumbHeight + fCaptionHeight + fThumbDistance +
+    FThumbFrameWith * 2) + fThumbTopOffset;
+    fContentWidth := fThumbWidth + FThumbFrameWith * 2 + fThumbLeftOffset;
   end;
 
   if FIls = IlsGrid then
   begin
+    SmallStep := fThumbHeight+fThumbDistance+fCaptionHeight+FThumbFrameWith*2;
+    LargeStep := (ClientHeight div (fThumbHeight+fThumbDistance+fCaptionHeight+FThumbFrameWith*2))*
+                 (fThumbHeight+fThumbDistance+fCaptionHeight+FThumbFrameWith*2);
     y := 0;
     x := 0;
-    fGridThumbsPerLine := ClientWidth div (fThumbWidth + fThumbDist + fPictureFrameBorder * 2);
+    fGridThumbsPerLine := ClientWidth div (fThumbWidth + fThumbDistance + FThumbFrameWith * 2);
+    if fGridThumbsPerLine<1 then fGridThumbsPerLine:=1;
     for i := 0 to fMngr.List.Count - 1 do
     begin
       if (i > 0) then
         if (i mod fGridThumbsPerLine = 0) then
         begin
-          inc(y, (fThumbHeight + fThumbDist + fTextExtraHeight + fPictureFrameBorder * 2));
+          inc(y, (fThumbHeight + fThumbDistance + fCaptionHeight + FThumbFrameWith * 2));
           x := 0;
         end
         else inc(x);
       TThreadedImage(fMngr.List[i]).Width := fThumbWidth;
       TThreadedImage(fMngr.List[i]).Height := fThumbHeight;
-      TThreadedImage(fMngr.List[i]).Left := x * (fThumbWidth + fThumbDist + fPictureFrameBorder * 2) +
-      fLeftOffset + fPictureFrameBorder;
-      TThreadedImage(fMngr.List[i]).Top := y + fTopOffset + fPictureFrameBorder;
+      TThreadedImage(fMngr.List[i]).Left := x * (fThumbWidth + fThumbDistance + FThumbFrameWith * 2) +
+      fThumbLeftOffset + FThumbFrameWith;
+      TThreadedImage(fMngr.List[i]).Top := y + fThumbTopOffset + FThumbFrameWith;
     end;
     fContentHeight := (fMngr.List.Count div fGridThumbsPerLine + 1) * (fThumbHeight +
-    fTextExtraHeight + fThumbDist + fPictureFrameBorder * 2) + fTopOffset;
+    fCaptionHeight + fThumbDistance + FThumbFrameWith * 2) + fThumbTopOffset;
     fContentWidth := ClientWidth;
   end;
 
@@ -726,9 +976,8 @@ begin
   UpdateDims;
 end;
 
-
 constructor TThumbControl.Create(AOwner: TComponent);
-var ff: TFontFinder;
+//var ff: TFontFinder;
 begin
   inherited Create(AOwner);
 
@@ -736,48 +985,60 @@ begin
 
   FURLList := TStringList.create;
 
-  ff := TFontFinder.Create;
-  Font.Name := ff.FindAFontFromDelimitedString('Trebuchet MS,Schumacher Clean');
-  Font.size := 7;
-  ff.free;
+  //ff := TFontFinder.Create;
+  ////Font.Name := ff.FindAFontFromDelimitedString('Trebuchet MS,Schumacher Clean');
+  ////Font.size := 7;
+  //Font.Name := ff.FindAFontFromDelimitedString('Arial');
+  //Font.size := 14;
+  //ff.free;
+
+  fColorActiveFrame:=clRed;
+  fColorFont:=clBlack;
+  fColorFontSelected:=clwhite;
+  FCaptionHeight:=8;
 
   fWindowCreated := false;
   DoubleBuffered := true;
   fThumbWidth := 80;
   fThumbHeight := 80;
-  fUserThumbWidth := fThumbHeight;
+  fResizeFactor:=0;
+  fUserThumbWidth := fThumbWidth;
   fUserThumbHeight := fThumbHeight;
+  FSelectStyle:=ssAlpha;
 
   fContentWidth := GetControlClassDefaultSize.cx;
   fContentHeight := GetControlClassDefaultSize.cy;
 
-  fThumbDist := 10;
+  fThumbDistance := 5;
+  fThumbLeftOffset := fThumbDistance;
+  fThumbTopOffset := fThumbDistance;
+  FThumbFrameWith := 5;
 
-  fLeftOffset := fThumbDist;
-  fTopOffset := fThumbDist;
   FShowCaptions := true;
-  fTextExtraHeight := 0;
-  FShowPictureFrame := true;
-  fPictureFrameBorder := StockBorderWidth;
+
+  FColorSelect:=$00FFBFBF;
 
   fMngr := TImageLoaderManager.Create;
-  fMngr.OnLoadURL := @ImgLoadURL;
-  fMngr.OnLoaded := @ImgLoaded;
+  fMngr.OnNeedRepaint := @ImgRepaint;
+  fMngr.OnItemIndexChanged:= @ItemIndexChanged;
+  fMngr.SelectColor:=FColorSelect;
+  fMngr.CaptionHeight:=FCaptionHeight;
+  fMngr.ThumbFrameWith:=FThumbFrameWith;
   fAutoSort:=true;
 
   SmallStep := fThumbWidth;
   LargeStep := fThumbWidth * 4;
 
-  fFrame := TBitmap.Create;
-
+  fBackground := TBitmap.Create;
   fDirectory := GetUserDir;
 end;
 
 destructor TThumbControl.Destroy;
 begin
+  if Assigned(FOnDestroy) then FOnDestroy(Self);
   FURLList.Free;
-  fMngr.free;
-  fFrame.free;
+  fMngr.Free;
+  fBackground.Free;
   inherited Destroy;
 end;
 
@@ -799,9 +1060,66 @@ begin
   end;
 end;
 
+procedure TThumbControl.DoEnter;
+begin
+  Repaint;
+  inherited DoEnter;
+end;
+
+procedure TThumbControl.DoExit;
+begin
+  Repaint;
+  inherited DoExit;
+end;
+
+procedure TThumbControl.MouseDown(Button: TMouseButton; Shift: TShiftState; X,
+  Y: Integer);
+begin
+  fMouseStartPos.x:=X;
+  fMouseStartPos.y:=Y;
+  fDragIDX:= fMngr.ItemIndexFromPoint(Point(X + HScrollPosition, Y + VScrollPosition));
+  inherited MouseDown(Button, Shift, X, Y);
+end;
+
+procedure TThumbControl.MouseMove(Shift: TShiftState; X, Y: Integer);
+begin
+  if Shift=[ssLeft] then begin
+    if fDragIDX>-1 then begin
+      if (ABS(fMouseStartPos.x-X)>20) or (ABS(fMouseStartPos.y-Y)>20) then begin
+        if fMngr.SelectedList.Count>1 then begin
+          DragCursor:=crMultiDrag;
+        end else begin
+          DragCursor:=crDrag;
+        end;
+        BeginDrag(True,0);
+      end;
+    end;
+  end;
+  inherited MouseMove(Shift, X, Y);
+end;
+
+procedure TThumbControl.MouseUp(Button: TMouseButton; Shift: TShiftState; X,
+  Y: Integer);
+begin
+  DoClick(Button,Shift,X,Y);
+  inherited MouseUp(Button, Shift, X, Y);
+end;
+
 function TThumbControl.ItemFromPoint(APoint: TPoint): TThreadedImage;
 begin
   Result := fMngr.ItemFromPoint(Point(APoint.X + HScrollPosition, APoint.Y + VScrollPosition));
+end;
+
+function TThumbControl.AddImage(Image: TThreadedImage): Integer;
+begin
+  Result:=fMngr.AddThreadedImage(Image);
+  //ImgRepaint(Image);
+end;
+
+procedure TThumbControl.DeleteSelectedImages;
+begin
+  fMngr.DeleteSelectedImages;
+  Arrange;
 end;
 
 procedure TThumbControl.LoadSelectedBitmap(ABitmap:TBitmap);
@@ -820,6 +1138,16 @@ begin
   end;
 end;
 
+procedure TThumbControl.ClearImageList;
+begin
+  fMngr.Clear;
+end;
+
+procedure TThumbControl.AddImagePointer(P: Pointer);
+begin
+  fMngr.AddImagePointer(P);
+end;
+
 
 procedure TThumbControl.ImgLoadURL(Sender: TObject);
 var Ext, Fn: string;
@@ -828,6 +1156,7 @@ var Ext, Fn: string;
   area: TRect;
   Strm: TStream;
 begin
+  IRes := nil;
   Strm := nil;
   TThreadedImage(Sender).LoadState := lsError;
   Fn := TThreadedImage(Sender).URL;
@@ -846,7 +1175,7 @@ begin
         Img.LoadFromStream(Strm, rdjpegthumb);
         Strm.free;
       end else Img.LoadFromFile(UTF8ToSys(Fn), rdjpegthumb);
-      IRes := ThumbResize(Img, fThumbWidth, fThumbHeight, area);
+      IRes := DoThumbResize(Img, fThumbWidth, fThumbHeight, area);
       try
         CSImg.Acquire;
         if TThreadedImage(Sender).Image <> nil
@@ -859,7 +1188,8 @@ begin
         CSImg.Release;
       end;
     finally
-      IRes.free;
+      if Assigned(IRes) then
+        IRes.free;
       rdjpegthumb.free;
       Img.free;
     end;
@@ -874,7 +1204,7 @@ begin
         Img.LoadFromStream(Strm);
         Strm.free;
       end else Img.LoadFromFile(UTF8ToSys(Fn));
-      IRes := ThumbResize(Img, fThumbWidth, fThumbHeight, area);
+      IRes := DoThumbResize(Img, fThumbWidth, fThumbHeight, area);
       try
         CSImg.Acquire;
         if TThreadedImage(Sender).Image <> nil then
@@ -893,8 +1223,57 @@ begin
   TThreadedImage(Sender).LoadState := lsLoading;
 end;
 
+procedure TThumbControl.ImgLoadPointer(Sender: TObject);
+var
+  Img, IRes: TFPMemoryImage;
+  Area: TRect;
+  Strm: TStream;
+begin
+  Strm := nil;
+  TThreadedImage(Sender).LoadState := lsError;
 
-procedure TThumbControl.ImgLoaded(Sender: TObject);
+  Img := TFPMemoryImage.Create(0, 0);
+  Img.UsePalette := false;
+  if Assigned(FOnLoadPointer) then OnLoadPointer(Sender,TThreadedImage(Sender).Pointer,Strm);
+  if Strm <> nil then begin
+    try
+      Img.LoadFromStream(Strm);
+      Strm.free;
+
+      if fResizeFactor=0 then begin
+        IRes:=DoThumbResize(Img,fThumbWidth,fThumbHeight,Area);
+      end else begin
+        IRes:=DoThumbResizeFactor(Img,fThumbWidth,fThumbHeight,fResizeFactor,Area);
+      end;
+
+      try
+        CSImg.Acquire;
+        if TThreadedImage(Sender).Image <> nil then
+        begin
+          TThreadedImage(Sender).Image.Assign(IRes);
+          TThreadedImage(Sender).Area := Area;
+        end;
+      finally
+        CSImg.Release;
+      end;
+    finally
+      IRes.free;
+      Img.free;
+    end;
+  end else begin
+    Area.Left:=0;
+    Area.Top:=0;
+    Area.Bottom:=fThumbHeight;
+    Area.Right:=fThumbWidth;
+    IRes:=TFPMemoryImage.create(fThumbWidth,fThumbHeight);
+    TThreadedImage(Sender).Image.Assign(IRes);
+    TThreadedImage(Sender).Area := Area;
+  end;
+  TThreadedImage(Sender).LoadState := lsLoading;
+end;
+
+
+procedure TThumbControl.ImgRepaint(Sender: TObject);
 var aRect: TRect;
 begin
   aRect := TThreadedImage(Sender).Rect;
@@ -918,10 +1297,8 @@ end;
 initialization
 {$I thumbctrl.lrs}
 {$I images.lrs}
-  frame := TPortableNetworkGraphic.create;
-  frame.LoadFromLazarusResource('framecropab');
 
 finalization
-  frame.free;
 
 end.
+

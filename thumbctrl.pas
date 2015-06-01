@@ -2,21 +2,20 @@
   This source is only used to compile and install the package.
  }
 
-unit thumbctrl; 
+unit thumbctrl;
 
 interface
 
 uses
-  FPReadJPEGthumb, fpthumbresize, scrollingcontrol, threadedimageLoader, 
-  thumbcontrol, LazarusPackageIntf;
+  scrollingcontrol, threadedimageLoader, thumbcontrol, LazarusPackageIntf;
 
 implementation
 
-procedure Register; 
+procedure Register;
 begin
-  RegisterUnit('thumbcontrol', @thumbcontrol.Register); 
-end; 
+  RegisterUnit('thumbcontrol', @thumbcontrol.Register);
+end;
 
 initialization
-  RegisterPackage('thumbctrl', @Register); 
+  RegisterPackage('thumbctrl', @Register);
 end.

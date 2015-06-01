@@ -10,7 +10,8 @@ unit scrollingcontrol;
 interface
 
 uses
-LCLType, LCLIntf, Classes, SysUtils, Forms, Controls, StdCtrls, messages;
+LCLType, LCLIntf, Classes, SysUtils, Forms, Controls, StdCtrls, messages,
+LMessages;
 
 type
 
@@ -50,6 +51,7 @@ type
     property VScrollInfo: TScrollInfo read fVScrollInfo write fVScrollInfo;
     property CanShowV: boolean read fCanShowV write SetCanShowV;
     property CanShowH: boolean read fCanShowH write SetCanShowH;
+    function DoMouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint): Boolean; override;
     property SmallStep: integer read fSmallStep write fSmallStep;
     property LargeStep: integer read fLargeStep write fLargeStep;
   public
@@ -93,7 +95,7 @@ begin
   FillChar(Destination^, Length, 0);
 end;
 
-procedure TScrollingControl.SetVScrollPos(NewPos: Integer);
+procedure TScrollingControl.SetVScrollPos(NewPos: Longint);
 begin
   FVScrollInfo.nPos := Max(0, Min(fVScrollInfo.nMax - fVScrollInfo.nPage, NewPos));
   SetScrollInfo(Handle, SB_VERT, fVScrollInfo, True);
@@ -105,37 +107,35 @@ procedure TScrollingControl.VScroll(var Msg: TWMScroll);
 var si: TScrollInfo;
 var newPos: Longint;
 begin
- if CanShowV then begin
-  {$IFDEF LCLqt}
-    newpos := Msg.Pos;
+{$IFDEF LCLqt}
+  newpos := Msg.Pos;
+{$ELSE}
+  ZeroMemory(@si, sizeof(si));
+  si.cbSize := sizeof(si);
+  si.fMask := SIF_TRACKPOS; //MSDN against 65k limit
+  {$IFDEF LCLGtk2}
+  newpos := Msg.Pos;
   {$ELSE}
-    ZeroMemory(@si, sizeof(si));
-    si.cbSize := sizeof(si);
-    si.fMask := SIF_TRACKPOS; //MSDN against 65k limit
-    {$IFDEF LCLGtk2}
-    newpos := Msg.Pos;
-    {$ELSE}
-    if GetScrollInfo(Handle, SB_VERT, si) then newPos := si.nTrackPos else  newpos := Msg.Pos;
-    {$ENDIF}
+  if GetScrollInfo(Handle, SB_VERT, si) then newPos := si.nTrackPos else  newpos := Msg.Pos;
   {$ENDIF}
-    case Msg.ScrollCode of
-      SB_THUMBPOSITION,
-	SB_THUMBTRACK:
-	begin
-	  SetVScrollPos(NewPos);
-	end;
-      SB_LINEDOWN: SetVScrollPos(FVScrollInfo.nPos + fSmallStep);
-      SB_PAGEDOWN: SetVScrollPos(FVScrollInfo.nPos + fLargeStep);
-      SB_LINEUP: SetVScrollPos(FVScrollInfo.nPos - fSmallStep);
-      SB_PAGEUP: SetVScrollPos(FVScrollInfo.nPos - fLargeStep);
-      SB_TOP: SetVScrollPos(0);
-      SB_BOTTOM: SetVScrollPos(FVScrollInfo.nMax);
-    end;
+{$ENDIF}
+  case Msg.ScrollCode of
+    SB_THUMBPOSITION,
+      SB_THUMBTRACK:
+      begin
+        SetVScrollPos(NewPos);
+      end;
+    SB_LINEDOWN: SetVScrollPos(FVScrollInfo.nPos + fSmallStep);
+    SB_PAGEDOWN: SetVScrollPos(FVScrollInfo.nPos + fLargeStep);
+    SB_LINEUP: SetVScrollPos(FVScrollInfo.nPos - fSmallStep);
+    SB_PAGEUP: SetVScrollPos(FVScrollInfo.nPos - fLargeStep);
+    SB_TOP: SetVScrollPos(0);
+    SB_BOTTOM: SetVScrollPos(FVScrollInfo.nMax);
   end;
 end;
 
 
-procedure TScrollingControl.SetHScrollPos(NewPos: Integer);
+procedure TScrollingControl.SetHScrollPos(NewPos: Longint);
 begin
   fHScrollInfo.nPos := Max(0, Min(fHScrollInfo.nMax - fHScrollInfo.nPage, NewPos));
   SetScrollInfo(Handle, SB_HORZ, fHScrollInfo, True);
@@ -337,6 +337,16 @@ begin
     SetVScrollPos(VScrollInfo.nPos);
   end;
 
+end;
+
+function TScrollingControl.DoMouseWheel(Shift: TShiftState;
+  WheelDelta: Integer; MousePos: TPoint): Boolean;
+begin
+  Result:=inherited DoMouseWheel(Shift, WheelDelta, MousePos);
+  {$IFDEF WINDOWS}
+  fVScrollInfo.nPos -= WheelDelta div 2;
+  UpdateVScrollInfo;
+  {$ENDIF}
 end;
 
 
