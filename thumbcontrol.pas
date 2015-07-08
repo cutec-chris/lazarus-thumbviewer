@@ -713,7 +713,7 @@ var i, tlen: integer;
   Cim: TThreadedImage;
 begin
   begin
-    if Canvas.Clipping {$ifdef LCLQt} and false {$endif} then
+    if Canvas.Clipping  and false  then
     begin
       ARect := Canvas.ClipRect;
       Clipped := not EqualRect(ARect, ClientRect);
@@ -726,7 +726,8 @@ begin
     Canvas.Brush.Color := Color;
     Canvas.FillRect(ARect);
     OffsetRect(aRect, HScrollPosition, VScrollPosition);
-    if not clipped then fMngr.LoadRect(ARect);
+    if not clipped then
+      fMngr.LoadRect(ARect);
 
     Canvas.Brush.color :=  $F1F1F1;
 

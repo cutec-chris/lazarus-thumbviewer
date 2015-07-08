@@ -53,6 +53,7 @@ type
     function GetImage: TFPMemoryImage;
     function GetName: string;
     function GetRect: TRect;
+    procedure SetLoadState(AValue: TLoadState);
     procedure SetSelected(AValue: Boolean);
     procedure ThreadTerm(Sender: TObject);
     procedure Select;
@@ -73,7 +74,7 @@ type
     property Image: TFPMemoryImage read GetImage;
     property Bitmap: TBitmap read FBitmap write FBitmap;
     property BitmapSelected: TBitmap read FBitmapSelected write FBitmapSelected;
-    property LoadState: TLoadState read FLoadState write FLoadState;
+    property LoadState: TLoadState read FLoadState write SetLoadState;
     property URL: UTF8String read FURL write FURL;
     property Name : string read GetName write FName;
     property Left: integer read FRect.Left write FRect.Left;
@@ -292,6 +293,12 @@ begin
   Result := fRect;
 end;
 
+procedure TThreadedImage.SetLoadState(AValue: TLoadState);
+begin
+  if FLoadState=AValue then Exit;
+  FLoadState:=AValue;
+end;
+
 procedure TThreadedImage.SetSelected(AValue: Boolean);
 begin
   if FSelected=AValue then Exit;
@@ -492,7 +499,7 @@ procedure TImageLoaderManager.LoadRect(ARect: TRect);
 var i: integer;
   Dum: TRect;
 begin
-  FQueue.Clear;
+  //FQueue.Clear;
 
   if not FMultiThreaded then
   begin
