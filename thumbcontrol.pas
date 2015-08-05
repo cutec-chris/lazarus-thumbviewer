@@ -278,7 +278,7 @@ procedure TThumbControl.Init;
 begin
   if not (csDesigning in ComponentState) then
   begin
-    fMngr.Clear;
+    //fMngr.Clear;
     Search;
     if fAutoSort then fMngr.Sort(0);
     Arrange;
