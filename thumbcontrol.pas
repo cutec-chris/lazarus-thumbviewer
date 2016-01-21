@@ -828,7 +828,11 @@ begin
   sl.Delimiter := ';';
   for i := 0 to ImageHandlers.Count - 1 do
   begin
+    {$IF FPC_VERSION>=3}
+    sl.DelimitedText := ImageHandlers.Extensions[ImageHandlers.TypeNames[i]];
+    {$ELSE}
     sl.DelimitedText := ImageHandlers.Extentions[ImageHandlers.TypeNames[i]];
+    {$ENDIF}
     for j := 0 to sl.Count - 1 do Result := Result + '*.' + sl[j] + ';';
   end;
   sl.free;
