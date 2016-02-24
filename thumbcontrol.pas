@@ -11,7 +11,7 @@ interface
 
 uses
   Classes, SysUtils, scrollingcontrol, ThreadedImageLoader, types,
-  Graphics, fpImage, FPReadJPEGthumb, fpthumbresize,LResources,
+  Graphics, fpImage, fpthumbresize,LResources,
   FileUtil, Dialogs, GraphType, LCLIntf, Controls,LMessages;
 
 
@@ -1157,7 +1157,6 @@ end;
 procedure TThumbControl.ImgLoadURL(Sender: TObject);
 var Ext, Fn: string;
   Img, IRes: TFPMemoryImage;
-  rdjpegthumb: TFPReaderJPEG;
   area: TRect;
   Strm: TStream;
 begin
@@ -1166,64 +1165,29 @@ begin
   TThreadedImage(Sender).LoadState := lsError;
   Fn := TThreadedImage(Sender).URL;
   Ext := LowerCase(ExtractFileExt(LowerCase(Fn)));
-  if (Ext = '.jpg') or (Ext = '.jpeg') then
-  begin
-    Img := TFPMemoryImage.Create(0, 0);
-    Img.UsePalette := false;
-    rdjpegthumb := TFPReaderJPEG.Create;
-    rdjpegthumb.MinHeight := fThumbHeight;
-    rdjpegthumb.MinWidth := fThumbWidth;
+  Img := TFPMemoryImage.Create(0, 0);
+  Img.UsePalette := false;
+  try
+    if Assigned(FOnLoadFile) then OnLoadFile(Sender, Fn, Strm);
+    if Strm <> nil then
+    begin
+      Img.LoadFromStream(Strm);
+      Strm.free;
+    end else Img.LoadFromFile(UTF8ToSys(Fn));
+    IRes := DoThumbResize(Img, fThumbWidth, fThumbHeight, area);
     try
-      if Assigned(FOnLoadFile) then OnLoadFile(Sender, Fn, Strm);
-      if Strm <> nil then
+      CSImg.Acquire;
+      if TThreadedImage(Sender).Image <> nil then
       begin
-        Img.LoadFromStream(Strm, rdjpegthumb);
-        Strm.free;
-      end else Img.LoadFromFile(UTF8ToSys(Fn), rdjpegthumb);
-      IRes := DoThumbResize(Img, fThumbWidth, fThumbHeight, area);
-      try
-        CSImg.Acquire;
-        if TThreadedImage(Sender).Image <> nil
-          then
-        begin
-          TThreadedImage(Sender).Image.Assign(IRes);
-          TThreadedImage(Sender).Area := Area;
-        end;
-      finally
-        CSImg.Release;
+        TThreadedImage(Sender).Image.Assign(IRes);
+        TThreadedImage(Sender).Area := Area;
       end;
     finally
-      if Assigned(IRes) then
-        IRes.free;
-      rdjpegthumb.free;
-      Img.free;
+      CSImg.Release;
     end;
-  end else
-  begin
-    Img := TFPMemoryImage.Create(0, 0);
-    Img.UsePalette := false;
-    try
-      if Assigned(FOnLoadFile) then OnLoadFile(Sender, Fn, Strm);
-      if Strm <> nil then
-      begin
-        Img.LoadFromStream(Strm);
-        Strm.free;
-      end else Img.LoadFromFile(UTF8ToSys(Fn));
-      IRes := DoThumbResize(Img, fThumbWidth, fThumbHeight, area);
-      try
-        CSImg.Acquire;
-        if TThreadedImage(Sender).Image <> nil then
-        begin
-          TThreadedImage(Sender).Image.Assign(IRes);
-          TThreadedImage(Sender).Area := Area;
-        end;
-      finally
-        CSImg.Release;
-      end;
-    finally
-      IRes.free;
-      Img.free;
-    end;
+  finally
+    IRes.free;
+    Img.free;
   end;
   TThreadedImage(Sender).LoadState := lsLoading;
 end;
