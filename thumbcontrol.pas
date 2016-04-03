@@ -12,7 +12,8 @@ interface
 uses
   Classes, SysUtils, scrollingcontrol, ThreadedImageLoader, types,
   Graphics, fpImage, fpthumbresize,LResources,
-  FileUtil, Dialogs, GraphType, LCLIntf, Controls,LMessages;
+  FileUtil, Dialogs, GraphType, LCLIntf, Controls,LMessages,LCLVersion
+  ;
 
 
 type
@@ -236,7 +237,11 @@ procedure Register;
 implementation
 
 uses LCLType, Forms, fontfinder,
-fpreadgif,FPReadPSD,FPReadPCX,FPReadTGA; //just register them
+fpreadgif,FPReadPSD,FPReadPCX,FPReadTGA
+{$if lcl_fullversion >= 01070000}
+,LazFileUtils,LazUTF8
+{$endif}
+; //just register them
 
 
 function ShortenString(AValue: string; Width: integer; ACanvas: TCanvas): string;
