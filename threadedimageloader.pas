@@ -708,7 +708,11 @@ var i: integer;
 begin
   try
     CSImg.Acquire;
-    for i := 0 to fList.Count - 1 do TThreadedImage(fList[i]).FreeImage;
+    for i := 0 to fList.Count - 1 do
+      begin
+        TThreadedImage(fList[i]).FreeImage;
+        fList[i]:=nil;
+      end;
   finally
     CSImg.Release;
   end;
